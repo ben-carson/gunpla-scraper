@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { scrapeAllWebsites } = require('./server/scraper');
+const { scrapeAllWebsites, getRecentSearches, getSearchResults } = require('./server/scraper');
 const utils = require('./server/utils');
 const readline = require('readline');
 const fs = require('fs');
@@ -19,11 +19,11 @@ async function runScraper(searchTerm, options = {}) {
   console.log('This may take some time depending on the number of websites...\n');
   
   try {
-    // Ensure the data directory exists
-    const dataDir = utils.ensureDataDir(__dirname);
-    
     // Run the scraper
-    const results = await scrapeAllWebsites(searchTerm);
+    const results = await scrapeAllWebsites(searchTerm, {
+      delay: options.fast ? 500 : 2000,
+      timeout: options.longTimeout ? 30000 : 10000
+    });
     
     // Print a summary of results
     console.log('\n===== SCRAPING RESULTS =====');
@@ -39,17 +39,12 @@ async function runScraper(searchTerm, options = {}) {
     }
     
     console.log(`\nTotal results: ${totalResults} from ${sitesWithResults} sites`);
-    console.log(`Results saved to the data directory.`);
-    
-    // Save the results to a file with a timestamp
-    const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\..+/, '');
-    const resultsFile = path.join(dataDir, `results_${searchTerm.replace(/\s+/g, '_')}_${timestamp}.json`);
-    utils.saveToJson(resultsFile, results);
-    
-    console.log(`Full results saved to: ${resultsFile}`);
+    console.log(`Results saved to the database.`);
     
     // Create HTML report if there are results
     if (totalResults > 0) {
+      const dataDir = utils.ensureDataDir(__dirname);
+      const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\..+/, '');
       const reportFile = path.join(dataDir, `report_${searchTerm.replace(/\s+/g, '_')}_${timestamp}.html`);
       createHtmlReport(reportFile, searchTerm, results);
       console.log(`HTML report created: ${reportFile}`);
@@ -64,6 +59,80 @@ async function runScraper(searchTerm, options = {}) {
   } catch (error) {
     console.error('Error during scraping:', error.message);
     return { totalResults: 0, sitesWithResults: 0, error: error.message };
+  }
+}
+
+// Function to show recent searches
+async function showRecentSearches() {
+  try {
+    const searches = await getRecentSearches();
+    
+    if (searches.length === 0) {
+      console.log('No recent searches found.');
+      return;
+    }
+    
+    console.log('\n===== RECENT SEARCHES =====');
+    
+    for (const search of searches) {
+      const date = new Date(search.timestamp).toLocaleString();
+      console.log(`${search.id}. "${search.search_term}" - ${search.total_results} results (${date})`);
+    }
+    
+    // Ask if user wants to view a specific search
+    rl.question('\nEnter a search ID to view results (or press Enter to skip): ', async (answer) => {
+      const searchId = parseInt(answer.trim());
+      
+      if (!isNaN(searchId) && searchId > 0) {
+        await viewSearchResults(searchId);
+      } else {
+        mainMenu();
+      }
+    });
+  } catch (error) {
+    console.error('Error retrieving recent searches:', error.message);
+    mainMenu();
+  }
+}
+
+// Function to view search results
+async function viewSearchResults(searchId) {
+  try {
+    const { search, results } = await getSearchResults(searchId);
+    
+    console.log(`\n===== RESULTS FOR "${search.search_term}" =====`);
+    console.log(`Search date: ${new Date(search.timestamp).toLocaleString()}`);
+    
+    let totalResults = 0;
+    let sitesWithResults = 0;
+    
+    for (const [site, siteResults] of Object.entries(results)) {
+      console.log(`${site}: ${siteResults.length} results`);
+      totalResults += siteResults.length;
+      if (siteResults.length > 0) {
+        sitesWithResults++;
+      }
+    }
+    
+    console.log(`\nTotal results: ${totalResults} from ${sitesWithResults} sites`);
+    
+    // Create a report file
+    const dataDir = utils.ensureDataDir(__dirname);
+    const reportFile = path.join(dataDir, `report_searchid_${searchId}.html`);
+    createHtmlReport(reportFile, search.search_term, results);
+    console.log(`\nHTML report created: ${reportFile}`);
+    
+    // Ask if user wants to open the report
+    rl.question('Open the report in browser? (y/n): ', (answer) => {
+      if (answer.toLowerCase() === 'y') {
+        openInBrowser(reportFile);
+      }
+      
+      mainMenu();
+    });
+  } catch (error) {
+    console.error('Error retrieving search results:', error.message);
+    mainMenu();
   }
 }
 
@@ -242,30 +311,70 @@ function openInBrowser(filePath) {
   });
 }
 
-// Check if a search term was provided as a command line argument
-const searchTermArg = process.argv[2];
-const openReport = process.argv.includes('--open-report');
-
-if (searchTermArg) {
-  // If a search term was provided, run the scraper with it
-  runScraper(searchTermArg, { openReport }).then(() => rl.close());
-} else {
-  // Otherwise, prompt the user for a search term
-  console.log('=== Gunpla Scraper ===');
-  console.log('This tool will search multiple online stores for Gunpla kits.');
+// Main menu function
+function mainMenu() {
+  console.log('\n=== Gunpla Scraper ===');
+  console.log('1. New search');
+  console.log('2. View recent searches');
+  console.log('3. Exit');
   
-  rl.question('Enter a search term (e.g., "RG Gundam", "MG Zaku"): ', (answer) => {
-    if (answer.trim()) {
-      runScraper(answer.trim(), { openReport }).then(() => rl.close());
-    } else {
-      console.log('No search term provided. Exiting...');
-      rl.close();
+  rl.question('\nEnter your choice (1-3): ', (answer) => {
+    switch (answer.trim()) {
+      case '1':
+        rl.question('Enter a search term (e.g., "RG Gundam", "MG Zaku"): ', (searchTerm) => {
+          if (searchTerm.trim()) {
+            rl.question('Open report in browser after scraping? (y/n): ', (openAnswer) => {
+              const openReport = openAnswer.toLowerCase() === 'y';
+              
+              rl.question('Use fast mode (less delay between requests)? (y/n): ', (fastAnswer) => {
+                const fast = fastAnswer.toLowerCase() === 'y';
+                
+                rl.question('Use longer timeout for slow sites? (y/n): ', (timeoutAnswer) => {
+                  const longTimeout = timeoutAnswer.toLowerCase() === 'y';
+                  
+                  runScraper(searchTerm.trim(), { openReport, fast, longTimeout })
+                    .then(() => mainMenu());
+                });
+              });
+            });
+          } else {
+            console.log('No search term provided.');
+            mainMenu();
+          }
+        });
+        break;
+      case '2':
+        showRecentSearches();
+        break;
+      case '3':
+        console.log('\nThank you for using Gunpla Scraper!');
+        rl.close();
+        break;
+      default:
+        console.log('Invalid choice. Please try again.');
+        mainMenu();
+        break;
     }
   });
 }
 
+// Check if a search term was provided as a command line argument
+const searchTermArg = process.argv[2];
+
+if (searchTermArg) {
+  // If a search term was provided, run the scraper with it
+  const openReport = process.argv.includes('--open-report');
+  const fast = process.argv.includes('--fast');
+  const longTimeout = process.argv.includes('--long-timeout');
+  
+  runScraper(searchTermArg, { openReport, fast, longTimeout })
+    .then(() => rl.close());
+} else {
+  // Otherwise, show the main menu
+  mainMenu();
+}
+
 // Handle readline close
 rl.on('close', () => {
-  console.log('\nThank you for using Gunpla Scraper!');
   process.exit(0);
 });

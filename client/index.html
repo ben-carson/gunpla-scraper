@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gunpla Scraper</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      padding-top: 20px;
+      padding-bottom: 40px;
+      background-color: #f5f5f5;
+    }
+    .card {
+      margin-bottom: 20px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .search-form {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .product-card {
+      height: 100%;
+      transition: transform 0.2s;
+    }
+    .product-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    .product-image {
+      height: 180px;
+      object-fit: contain;
+      background-color: #f8f9fa;
+      padding: 10px;
+    }
+    .loading {
+      display: none;
+      margin: 20px auto;
+      text-align: center;
+    }
+    .loading-spinner {
+      width: 3rem;
+      height: 3rem;
+    }
+    .badge.bg-site {
+      background-color: #6c757d;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="mb-4 text-center">
+      <h1>Gunpla Scraper</h1>
+      <p class="lead">Search for Gunpla kits across multiple online stores</p>
+    </header>
+    
+    <nav>
+      <div class="nav nav-tabs mb-4" id="nav-tab" role="tablist">
+        <button class="nav-link active" id="nav-search-tab" data-bs-toggle="tab" data-bs-target="#nav-search" type="button" role="tab" aria-controls="nav-search" aria-selected="true">New Search</button>
+        <button class="nav-link" id="nav-history-tab" data-bs-toggle="tab" data-bs-target="#nav-history" type="button" role="tab" aria-controls="nav-history" aria-selected="false">Search History</button>
+      </div>
+    </nav>
+    
+    <div class="tab-content" id="nav-tabContent">
+      <!-- New Search Tab -->
+      <div class="tab-pane fade show active" id="nav-search" role="tabpanel" aria-labelledby="nav-search-tab">
+        <div class="search-form">
+          <form id="search-form">
+            <div class="mb-3">
+              <label for="search-term" class="form-label">Search Term</label>
+              <input type="text" class="form-control" id="search-term" placeholder="e.g., RG Unicorn, MG Zaku" required>
+            </div>
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="fast-mode">
+                  <label class="form-check-label" for="fast-mode">
+                    Fast Mode (less delay between requests)
+                  </label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="long-timeout">
+                  <label class="form-check-label" for="long-timeout">
+                    Long Timeout (for slow sites)
+                  </label>
+                </div>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Start Search</button>
+          </form>
+        </div>
+        
+        <div class="loading" id="search-loading">
+          <div class="spinner-border loading-spinner text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <p class="mt-2">Searching across multiple sites... This may take a few minutes.</p>
+        </div>
+        
+        <div id="search-result" class="alert alert-info d-none">
+          Search started. Check the "Search History" tab for results.
+        </div>
+      </div>
+      
+      <!-- Search History Tab -->
+      <div class="tab-pane fade" id="nav-history" role="tabpanel" aria-labelledby="nav-history-tab">
+        <div class="card">
+          <div class="card-header">
+            Recent Searches
+          </div>
+          <div class="card-body">
+            <div class="loading" id="history-loading">
+              <div class="spinner-border loading-spinner text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+            </div>
+            <div id="searches-list">
+              <p class="text-muted">No recent searches found.</p>
+            </div>
+          </div>
+        </div>
+        
+        <div id="search-detail" class="d-none">
+          <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span id="search-detail-title">Search Results</span>
+              <button id="back-to-list" class="btn btn-sm btn-outline-secondary">Back to List</button>
+            </div>
+            <div class="card-body">
+              <div class="loading" id="detail-loading">
+                <div class="spinner-border loading-spinner text-primary" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+              </div>
+              <div id="search-info" class="mb-4">
+                <strong>Search term:</strong> <span id="detail-search-term"></span><br>
+                <strong>Date:</strong> <span id="detail-date"></span><br>
+                <strong>Total results:</strong> <span id="detail-total"></span>
+              </div>
+              
+              <div id="results-container"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const searchForm = document.getElementById('search-form');
+      const searchResult = document.getElementById('search-result');
+      const searchLoading = document.getElementById('search-loading');
+      const historyLoading = document.getElementById('history-loading');
+      const detailLoading = document.getElementById('detail-loading');
+      const searchesList = document.getElementById('searches-list');
+      const searchDetail = document.getElementById('search-detail');
+      const backToList = document.getElementById('back-to-list');
+      const searchDetailTitle = document.getElementById('search-detail-title');
+      const detailSearchTerm = document.getElementById('detail-search-term');
+      const detailDate = document.getElementById('detail-date');
+      const detailTotal = document.getElementById('detail-total');
+      const resultsContainer = document.getElementById('results-container');
+      const historyTab = document.getElementById('nav-history-tab');
+      
+      // Load recent searches when history tab is clicked
+      historyTab.addEventListener('click', loadRecentSearches);
+      
+      // Handle search form submission
+      searchForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        
+        const searchTerm = document.getElementById('search-term').value.trim();
+        const fastMode = document.getElementById('fast-mode').checked;
+        const longTimeout = document.getElementById('long-timeout').checked;
+        
+        if (!searchTerm) {
+          return;
+        }
+        
+        // Show loading
+        searchLoading.style.display = 'block';
+        searchResult.classList.add('d-none');
+        
+        // Submit the search
+        fetch('/api/searches', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            searchTerm,
+            options: {
+              fast: fastMode,
+              longTimeout: longTimeout
+            }
+          })
+        })
+        .then(response => response.json())
+        .then(data => {
+          // Hide loading
+          searchLoading.style.display = 'none';
+          
+          // Show result message
+          searchResult.textContent = data.message;
+          searchResult.classList.remove('d-none');
+        })
+        .catch(error => {
+          // Hide loading
+          searchLoading.style.display = 'none';
+          
+          // Show error
+          searchResult.textContent = 'Error: ' + error.message;
+          searchResult.classList.remove('d-none');
+          searchResult.classList.remove('alert-info');
+          searchResult.classList.add('alert-danger');
+        });
+      });
+      
+      // Load recent searches
+      function loadRecentSearches() {
+        // Show loading
+        historyLoading.style.display = 'block';
+        searchesList.innerHTML = '';
+        searchDetail.classList.add('d-none');
+        
+        // Fetch recent searches
+        fetch('/api/searches')
+          .then(response => response.json())
+          .then(searches => {
+            // Hide loading
+            historyLoading.style.display = 'none';
+            
+            if (searches.length === 0) {
+              searchesList.innerHTML = '<p class="text-muted">No recent searches found.</p>';
+              return;
+            }
+            
+            // Create table
+            const table = document.createElement('table');
+            table.className = 'table table-hover';
+            
+            // Create table header
+            const thead = document.createElement('thead');
+            thead.innerHTML = `
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">Search Term</th>
+                <th scope="col">Date</th>
+                <th scope="col">Results</th>
+                <th scope="col">Action</th>
+              </tr>
+            `;
+            table.appendChild(thead);
+            
+            // Create table body
+            const tbody = document.createElement('tbody');
+            
+            searches.forEach(search => {
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
+                <td>${search.id}</td>
+                <td>${search.search_term}</td>
+                <td>${new Date(search.timestamp).toLocaleString()}</td>
+                <td>${search.total_results}</td>
+                <td>
+                  <button class="btn btn-sm btn-primary view-search" data-id="${search.id}">View</button>
+                </td>
+              `;
+              tbody.appendChild(tr);
+            });
+            
+            table.appendChild(tbody);
+            searchesList.appendChild(table);
+            
+            // Add event listeners to view buttons
+            document.querySelectorAll('.view-search').forEach(button => {
+              button.addEventListener('click', function() {
+                const searchId = this.getAttribute('data-id');
+                viewSearchResults(searchId);
+              });
+            });
+          })
+          .catch(error => {
+            historyLoading.style.display = 'none';
+            searchesList.innerHTML = `<div class="alert alert-danger">Error loading searches: ${error.message}</div>`;
+          });
+      }
+      
+      // View search results
+      function viewSearchResults(searchId) {
+        // Show loading
+        searchesList.parentElement.parentElement.classList.add('d-none');
+        searchDetail.classList.remove('d-none');
+        detailLoading.style.display = 'block';
+        resultsContainer.innerHTML = '';
+        
+        // Fetch search results
+        fetch(`/api/searches/${searchId}`)
+          .then(response => response.json())
+          .then(data => {
+            // Hide loading
+            detailLoading.style.display = 'none';
+            
+            // Set search details
+            const { search, results } = data;
+            searchDetailTitle.textContent = `Results for "${search.search_term}"`;
+            detailSearchTerm.textContent = search.search_term;
+            detailDate.textContent = new Date(search.timestamp).toLocaleString();
+            
+            // Count total results
+            let totalResults = 0;
+            let sitesWithResults = 0;
+            
+            for (const siteName in results) {
+              const siteResults = results[siteName];
+              totalResults += siteResults.length;
+              if (siteResults.length > 0) {
+                sitesWithResults++;
+              }
+            }
+            
+            detailTotal.textContent = `${totalResults} from ${sitesWithResults} sites`;
+            
+            // Create results by site
+            for (const siteName in results) {
+              const siteResults = results[siteName];
+              
+              if (siteResults.length === 0) continue;
+              
+              // Create site section
+              const siteSection = document.createElement('div');
+              siteSection.className = 'mb-4';
+              
+              // Create site header
+              const siteHeader = document.createElement('h4');
+              siteHeader.className = 'mb-3';
+              siteHeader.textContent = `${siteName} (${siteResults.length} results)`;
+              siteSection.appendChild(siteHeader);
+              
+              // Create products grid
+              const productsGrid = document.createElement('div');
+              productsGrid.className = 'row row-cols-1 row-cols-md-2 row-cols-lg-4 g-3';
+              
+              // Add products
+              siteResults.forEach(product => {
+                const productCard = document.createElement('div');
+                productCard.className = 'col';
+                productCard.innerHTML = `
+                  <div class="card product-card">
+                    ${product.image 
+                      ? `<img src="${product.image}" class="card-img-top product-image" alt="${product.title}" onerror="this.src='data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22100%22%20height%3D%22100%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23f9f9f9%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20font-family%3D%22Arial%22%20font-size%3D%2212%22%20text-anchor%3D%22middle%22%20dominant-baseline%3D%22middle%22%20fill%3D%22%23999%22%3ENo%20Image%3C%2Ftext%3E%3C%2Fsvg%3E';">`
+                      : `<div class="card-img-top product-image d-flex align-items-center justify-content-center bg-light">No Image</div>`
+                    }
+                    <div class="card-body">
+                      <h5 class="card-title">${product.title}</h5>
+                      <p class="card-text text-danger fw-bold">${product.price}</p>
+                      ${product.link && product.link !== '#'
+                        ? `<a href="${product.link}" class="btn btn-sm btn-primary" target="_blank">View Product</a>`
+                        : ''
+                      }
+                      <span class="badge bg-site mt-2">${siteName}</span>
+                    </div>
+                  </div>
+                `;
+                productsGrid.appendChild(productCard);
+              });
+              
+              siteSection.appendChild(productsGrid);
+              resultsContainer.appendChild(siteSection);
+            }
+          })
+          .catch(error => {
+            detailLoading.style.display = 'none';
+            resultsContainer.innerHTML = `<div class="alert alert-danger">Error loading results: ${error.message}</div>`;
+          });
+      }
+      
+      // Back to list button
+      backToList.addEventListener('click', function() {
+        searchDetail.classList.add('d-none');
+        searchesList.parentElement.parentElement.classList.remove('d-none');
+      });
+    });
+  </script>
+</body>
+</html>

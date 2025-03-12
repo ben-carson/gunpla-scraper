@@ -3,12 +3,20 @@ const cheerio = require('cheerio');
 const fs = require('fs');
 const path = require('path');
 const utils = require('./utils');
+const db = require('./db');
 
 // Read the URL list from the JSON file
 const urlList = require('../url-list-full.json');
 
-// Ensure the data directory exists
-const dataDir = utils.ensureDataDir(__dirname);
+// Initialize database and sites
+(async function init() {
+  try {
+    await db.initDatabase();
+    await db.initSites(urlList);
+  } catch (error) {
+    console.error('Error initializing database:', error.message);
+  }
+})();
 
 /**
  * Function to scrape a website with a search term
@@ -94,10 +102,14 @@ async function scrapeWebsite(siteName, baseUrl, searchTerm) {
 /**
  * Main function to scrape all websites
  * @param {string} searchTerm - The search term to look for
+ * @param {Object} options - Options for scraping (delay, timeout, etc.)
  * @returns {Object} - The combined results from all sites
  */
-async function scrapeAllWebsites(searchTerm) {
+async function scrapeAllWebsites(searchTerm, options = {}) {
   const results = {};
+  
+  // Set default options
+  const delay = options.delay || 2000;
   
   // Scrape each website
   for (const [siteName, baseUrl] of Object.entries(urlList)) {
@@ -105,31 +117,56 @@ async function scrapeAllWebsites(searchTerm) {
       const siteResults = await scrapeWebsite(siteName, baseUrl, searchTerm);
       results[siteName] = siteResults;
       
-      // Save individual site results
-      utils.saveToJson(
-        path.join(dataDir, `${siteName}.json`),
-        siteResults
-      );
-      
       // Add a small delay to avoid overwhelming the servers
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, delay));
     } catch (error) {
       console.error(`Error processing ${siteName}:`, error.message);
       results[siteName] = [];
     }
   }
   
-  // Save combined results
-  const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\..+/, '');
-  utils.saveToJson(
-    path.join(dataDir, `all_results_${searchTerm.replace(/\s+/g, '_')}_${timestamp}.json`),
-    results
-  );
+  // Save results to database
+  try {
+    const searchId = await db.saveSearch(searchTerm, results);
+    console.log(`Results saved to database with search ID: ${searchId}`);
+  } catch (error) {
+    console.error('Error saving to database:', error.message);
+  }
   
   return results;
 }
 
+/**
+ * Get search results from database
+ * @param {number} searchId - The search ID to retrieve
+ * @returns {Object} - The search results data
+ */
+async function getSearchResults(searchId) {
+  try {
+    return await db.getSearchResults(searchId);
+  } catch (error) {
+    console.error('Error fetching search results:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Get recent searches from database
+ * @param {number} limit - Maximum number of searches to return
+ * @returns {Array} - Array of recent searches
+ */
+async function getRecentSearches(limit = 10) {
+  try {
+    return await db.getRecentSearches(limit);
+  } catch (error) {
+    console.error('Error fetching recent searches:', error.message);
+    throw error;
+  }
+}
+
 module.exports = {
   scrapeWebsite,
-  scrapeAllWebsites
+  scrapeAllWebsites,
+  getSearchResults,
+  getRecentSearches
 };

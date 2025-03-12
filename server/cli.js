@@ -27,14 +27,11 @@ if (!searchTerm) {
 console.log(`Starting scraper for search term: "${searchTerm}"`);
 console.log('This may take some time depending on the number of websites...\n');
 
-// Ensure the data directory exists
-const dataDir = utils.ensureDataDir(__dirname);
-
 // Run the scraper
-scrapeAllWebsites(searchTerm)
+scrapeAllWebsites(searchTerm, options)
   .then(results => {
     console.log('\n===== SCRAPING COMPLETED =====');
-    console.log('Results saved to the data directory.');
+    console.log('Results saved to the database.');
     
     // Print a summary of results
     let totalResults = 0;
@@ -56,7 +53,9 @@ scrapeAllWebsites(searchTerm)
     
     // Create a simple HTML report
     if (totalResults > 0) {
-      const reportPath = path.join(dataDir, `report_${searchTerm.replace(/\s+/g, '_')}.html`);
+      const dataDir = utils.ensureDataDir(__dirname);
+      const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\..+/, '');
+      const reportPath = path.join(dataDir, `report_${searchTerm.replace(/\s+/g, '_')}_${timestamp}.html`);
       createHtmlReport(reportPath, searchTerm, results);
       console.log(`\nHTML report created: ${reportPath}`);
     }
