@@ -49,55 +49,76 @@ function getSiteSelectors(siteName) {
   const selectors = {
     // Default selectors that might work on some sites
     default: {
-      container: 'div.product, div.item, div.product-item, div.product-card',
-      title: 'h2, h3, h4, .title, .name',
-      price: '.price, .product-price',
+      container: 'div.product, div.item, div.product-item, div.product-card, article.product-card, .grid-product, .product-grid__item',
+      title: 'h2, h3, h4, .title, .name, .product-title, .card__heading',
+      price: '.price, .product-price, .money, .price-item',
       link: 'a',
       image: 'img'
     },
     
     // Site-specific selectors
     gundam_place: {
-      container: '.product-item',
-      title: '.product-item-title',
-      price: '.product-item-price',
-      link: 'a',
-      image: 'img'
+      container: '.grid-product, .card, .product-grid-item, article.card, .product-card',
+      title: '.card__heading, .product-card__title, .product-title, h3, .title',
+      price: '.price, .money, .product-price, .price-item',
+      link: 'a.grid-product__link, a.full-unstyled-link, a.product-link, a',
+      image: 'img',
+      baseUrl: 'https://gundamplacestore.com'
     },
     
     az_toy_hobby: {
-      container: '.product-card',
-      title: '.product-card__title',
-      price: '.product-card__price',
+      container: '.product-card, .card, li.grid__item',
+      title: '.product-card__title, .card-information__text, .card__heading, h3',
+      price: '.product-card__price, .price, .price-item, .money',
       link: 'a',
       image: 'img',
       baseUrl: 'https://aztoyhobby.com'
     },
     
     usags: {
-      container: '.product-item',
-      title: '.product-item-title',
-      price: '.product-item-price',
+      container: '.product-item, .product-grid-item, .grid-product, .grid__item',
+      title: '.product-item-title, .grid-product__title, h3, .title',
+      price: '.product-item-price, .grid-product__price, .price',
       link: 'a',
-      image: 'img'
+      image: 'img',
+      baseUrl: 'https://www.usagundamstore.com'
     },
     
     newtype: {
-      container: '.product-card',
-      title: '.product-card__title',
-      price: '.product-card__price',
+      container: '.product-card, .card, article, .product',
+      title: '.product-card__title, .title, h3, .card__title',
+      price: '.product-card__price, .price, .money',
       link: 'a',
-      image: 'img'
+      image: 'img',
+      baseUrl: 'https://newtype.us'
+    },
+    
+    amazon: {
+      container: '.s-result-item, .sg-col-4-of-12',
+      title: '.a-text-normal, h2, .a-size-base-plus',
+      price: '.a-price, .a-offscreen',
+      link: 'a.a-link-normal',
+      image: 'img',
+      baseUrl: 'https://www.amazon.com'
+    },
+    
+    ebay: {
+      container: '.s-item, .s-item__wrapper',
+      title: '.s-item__title, h3',
+      price: '.s-item__price',
+      link: '.s-item__link',
+      image: '.s-item__image-img',
+      baseUrl: 'https://www.ebay.com'
     },
     
     gundam_galaxy: {
-      container: '.item',
-      title: '.name',
-      price: '.price',
+      container: '.item, .product, .product-item',
+      title: '.name, .title, h3',
+      price: '.price, .money',
       link: 'a',
       image: 'img',
       baseUrl: 'https://www.thegundamgalaxy.com'
-    }
+    },
     
     // Add more site-specific selectors as needed
   };
