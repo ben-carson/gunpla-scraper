@@ -58,10 +58,10 @@ function getSiteSelectors(siteName) {
     
     // Site-specific selectors
     gundam_place: {
-      container: '.grid-product, .card, .product-grid-item, article.card, .product-card',
-      title: '.card__heading, .product-card__title, .product-title, h3, .title',
-      price: '.price, .money, .product-price, .price-item',
-      link: 'a.grid-product__link, a.full-unstyled-link, a.product-link, a',
+      container: 'list-menu-item[data-title], div.grid-product, article.card',
+      title: '.label, [class*="title"], h3',
+      price: '.price, .price-item, .money',
+      link: 'a[href]',
       image: 'img',
       baseUrl: 'https://gundamplacestore.com'
     },
