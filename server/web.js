@@ -10,7 +10,7 @@ const utils = require('./utils');
 
 // Create Express app
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3001;
 
 // Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
