@@ -58,9 +58,9 @@ function getSiteSelectors(siteName) {
     
     // Site-specific selectors
     gundam_place: {
-      container: 'list-menu-item[data-title], div.grid-product, article.card',
-      title: '.label, [class*="title"], h3',
-      price: '.price, .price-item, .money',
+      container: 'li.snize-product',
+      title: '.snize-title, .label, [class*="title"], h3',
+      price: '.snize-price, .price, .price-item, .money',
       link: 'a[href]',
       image: 'img',
       baseUrl: 'https://gundamplacestore.com'

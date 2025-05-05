@@ -206,24 +206,26 @@ async function scrapeWebsite(siteName, baseUrl, searchTerm) {
  */
 async function scrapeAllWebsites(searchTerm, options = {}) {
   const results = {};
-  
-  // Set default options
   const delay = options.delay || 2000;
-  
-  // Scrape each website
-  for (const [siteName, baseUrl] of Object.entries(urlList)) {
+
+  // Determine which sites to scrape
+  let sitesToScrape = Object.entries(urlList);
+  if (options.sites && Array.isArray(options.sites) && options.sites.length > 0) {
+    sitesToScrape = sitesToScrape.filter(([siteName]) => options.sites.includes(siteName));
+  }
+
+  // Scrape each selected website
+  for (const [siteName, baseUrl] of sitesToScrape) {
     try {
       const siteResults = await scrapeWebsite(siteName, baseUrl, searchTerm);
       results[siteName] = siteResults;
-      
-      // Add a small delay to avoid overwhelming the servers
       await new Promise(resolve => setTimeout(resolve, delay));
     } catch (error) {
       console.error(`Error processing ${siteName}:`, error.message);
       results[siteName] = [];
     }
   }
-  
+
   // Save results to database
   try {
     const searchId = await db.saveSearch(searchTerm, results);

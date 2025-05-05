@@ -73,6 +73,13 @@
               <label for="search-term" class="form-label">Search Term</label>
               <input type="text" class="form-control" id="search-term" placeholder="e.g., RG Unicorn, MG Zaku" required>
             </div>
+            <div class="mb-3">
+              <label class="form-label">Select Sites to Search</label>
+              <div id="site-checkboxes" class="row row-cols-2 row-cols-md-3 g-1">
+                <!-- Site checkboxes will be populated by JS -->
+              </div>
+              <div class="form-text">Leave all unchecked to search all sites.</div>
+            </div>
             <div class="row mb-3">
               <div class="col-md-6">
                 <div class="form-check">
@@ -168,7 +175,26 @@
       const detailTotal = document.getElementById('detail-total');
       const resultsContainer = document.getElementById('results-container');
       const historyTab = document.getElementById('nav-history-tab');
+      const siteCheckboxes = document.getElementById('site-checkboxes');
       
+      // Dynamically populate site checkboxes from url-list-full.json
+      fetch('/url-list-full.json')
+        .then(res => res.json())
+        .then(siteList => {
+          Object.keys(siteList).forEach(siteKey => {
+            const label = document.createElement('label');
+            label.className = 'form-check-label';
+            label.innerHTML = `
+              <input class="form-check-input me-1" type="checkbox" name="sites" value="${siteKey}">
+              ${siteKey}
+            `;
+            const div = document.createElement('div');
+            div.className = 'form-check';
+            div.appendChild(label);
+            siteCheckboxes.appendChild(div);
+          });
+        });
+
       // Load recent searches when history tab is clicked
       historyTab.addEventListener('click', loadRecentSearches);
       
@@ -179,6 +205,7 @@
         const searchTerm = document.getElementById('search-term').value.trim();
         const fastMode = document.getElementById('fast-mode').checked;
         const longTimeout = document.getElementById('long-timeout').checked;
+        const selectedSites = Array.from(document.querySelectorAll('input[name="sites"]:checked')).map(cb => cb.value);
         
         if (!searchTerm) {
           return;
@@ -198,7 +225,8 @@
             searchTerm,
             options: {
               fast: fastMode,
-              longTimeout: longTimeout
+              longTimeout: longTimeout,
+              sites: selectedSites.length > 0 ? selectedSites : undefined
             }
           })
         })
@@ -300,24 +328,24 @@
         searchDetail.classList.remove('d-none');
         detailLoading.style.display = 'block';
         resultsContainer.innerHTML = '';
-        
+
         // Fetch search results
         fetch(`/api/searches/${searchId}`)
           .then(response => response.json())
           .then(data => {
             // Hide loading
             detailLoading.style.display = 'none';
-            
+
             // Set search details
             const { search, results } = data;
             searchDetailTitle.textContent = `Results for "${search.search_term}"`;
             detailSearchTerm.textContent = search.search_term;
             detailDate.textContent = new Date(search.timestamp).toLocaleString();
-            
+
             // Count total results
             let totalResults = 0;
             let sitesWithResults = 0;
-            
+
             for (const siteName in results) {
               const siteResults = results[siteName];
               totalResults += siteResults.length;
@@ -325,29 +353,42 @@
                 sitesWithResults++;
               }
             }
-            
+
             detailTotal.textContent = `${totalResults} from ${sitesWithResults} sites`;
-            
-            // Create results by site
+
+            // Create results by site (collapsible)
+            let siteIndex = 0;
             for (const siteName in results) {
               const siteResults = results[siteName];
-              
               if (siteResults.length === 0) continue;
-              
+
+              // Unique ID for collapse
+              const collapseId = `collapse-site-${siteIndex}`;
+              siteIndex++;
+
               // Create site section
               const siteSection = document.createElement('div');
               siteSection.className = 'mb-4';
-              
-              // Create site header
+
+              // Create site header with collapse toggle
               const siteHeader = document.createElement('h4');
               siteHeader.className = 'mb-3';
-              siteHeader.textContent = `${siteName} (${siteResults.length} results)`;
+              siteHeader.innerHTML = `
+                <button class="btn btn-link p-0 fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
+                  <span class="me-2">▶</span>${siteName} (${siteResults.length} results)
+                </button>
+              `;
               siteSection.appendChild(siteHeader);
-              
+
+              // Create collapse container (collapsed by default)
+              const collapseDiv = document.createElement('div');
+              collapseDiv.className = 'collapse';
+              collapseDiv.id = collapseId;
+
               // Create products grid
               const productsGrid = document.createElement('div');
               productsGrid.className = 'row row-cols-1 row-cols-md-2 row-cols-lg-4 g-3';
-              
+
               // Add products
               siteResults.forEach(product => {
                 const productCard = document.createElement('div');
@@ -371,10 +412,26 @@
                 `;
                 productsGrid.appendChild(productCard);
               });
-              
-              siteSection.appendChild(productsGrid);
+
+              collapseDiv.appendChild(productsGrid);
+              siteSection.appendChild(collapseDiv);
               resultsContainer.appendChild(siteSection);
             }
+
+            // Add arrow rotation on collapse show/hide
+            resultsContainer.querySelectorAll('button[data-bs-toggle="collapse"]').forEach(btn => {
+              const span = btn.querySelector('span');
+              const targetId = btn.getAttribute('data-bs-target');
+              const collapseEl = document.querySelector(targetId);
+              if (collapseEl) {
+                collapseEl.addEventListener('show.bs.collapse', () => {
+                  span.textContent = '▼';
+                });
+                collapseEl.addEventListener('hide.bs.collapse', () => {
+                  span.textContent = '▶';
+                });
+              }
+            });
           })
           .catch(error => {
             detailLoading.style.display = 'none';

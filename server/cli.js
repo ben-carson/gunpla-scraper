@@ -13,6 +13,14 @@ const options = {
   verbose: process.argv.includes('--verbose')
 };
 
+// Parse --sites or -s option
+let selectedSites = null;
+const sitesArgIndex = process.argv.findIndex(arg => arg === '--sites' || arg === '-s');
+if (sitesArgIndex !== -1 && process.argv[sitesArgIndex + 1]) {
+  selectedSites = process.argv[sitesArgIndex + 1].split(',').map(s => s.trim()).filter(Boolean);
+}
+options.sites = selectedSites;
+
 if (!searchTerm) {
   console.error('Please provide a search term.');
   console.error('\nUsage: node cli.js "SEARCH_TERM" [OPTIONS]');
@@ -20,6 +28,7 @@ if (!searchTerm) {
   console.error('  --fast           Reduce delay between requests (may trigger rate limiting)');
   console.error('  --long-timeout   Use longer timeout for slow sites');
   console.error('  --verbose        Show more detailed output');
+  console.error('  --sites, -s       Comma-separated list of site keys to query (e.g. gundam_place,az_toy_hobby)');
   console.error('\nExample: node cli.js "RG Gundam" --fast');
   process.exit(1);
 }

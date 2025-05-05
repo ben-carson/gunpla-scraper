@@ -62,7 +62,8 @@ app.post('/api/searches', async (req, res) => {
     // Execute the search asynchronously
     scrapeAllWebsites(searchTerm, {
       delay: options.fast ? 500 : 2000,
-      timeout: options.longTimeout ? 30000 : 10000
+      timeout: options.longTimeout ? 30000 : 10000,
+      sites: Array.isArray(options.sites) && options.sites.length > 0 ? options.sites : undefined
     }).catch(error => {
       console.error('Error during scraping:', error.message);
     });
@@ -73,6 +74,11 @@ app.post('/api/searches', async (req, res) => {
 
 // Serve images from data directory
 app.use('/data', express.static(path.join(__dirname, '../data')));
+
+// Serve url-list-full.json for frontend site selection
+app.get('/url-list-full.json', (req, res) => {
+  res.sendFile(path.join(__dirname, '../url-list-full.json'));
+});
 
 // Start the server
 app.listen(port, '0.0.0.0', () => {
